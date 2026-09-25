@@ -133,14 +133,21 @@ _Y0, _PI0 = look_angles(_P0, _T0)
 # The light columns fill the slab 1.77 <= y + z <= 16.77 (m) in front of the wall.
 # Dolly forward at floor level into the light, then crane straight up out of
 # it, turning around so the image on the floor ends up upright.
-RISE_T0, RISE_T1 = 26.0, 32.2
+RISE_T0, RISE_T1 = 25.4, 32.6
+YAW_T0, YAW_T1 = 27.2, 32.8
 RISE_KEYS = [
-    (26.0, _P0, _Y0, _PI0),
-    (28.3, np.array([0.0, 2.7, 12.4]), 0.0, 24.0),          # into the beams, looking up at the glass
-    (29.6, np.array([-0.4, 5.8, 9.9]), 44.0, -30.0),        # rising inside the light, turning down
-    (30.8, np.array([-0.25, 13.2, 9.45]), 132.0, -72.0),    # out of the top of the columns
-    (32.2, np.array([0.0, 20.6, PATCH_Z]), 180.0, -90.0),   # straight down on the floor
+    (25.4, None, None, None),
+    (27.7, np.array([0.0, 2.7, 12.6]), None, 15.0),          # into the beams, looking up at the glass
+    (29.4, np.array([-0.4, 6.2, 9.9]), None, -34.0),         # rising inside the light, turning down
+    (30.9, np.array([-0.25, 13.8, 9.45]), None, -76.0),      # out of the top of the columns
+    (32.6, np.array([0.0, 20.6, PATCH_Z]), None, -90.0),     # straight down on the floor
 ]
+
+
+def _rise_start():
+    p, tg = nave_camera(RISE_T0)
+    y, pi = look_angles(p, tg)
+    return p, pi
 
 
 def trapezoid(x, a=0.22, b=0.30):
@@ -162,17 +169,18 @@ def _catmull(p0, p1, p2, p3, s):
 
 def camera(t):
     """Camera array C (see scene.cam_ray) for time t."""
-    if t < 26.0:
+    if t < RISE_T0:
         pos, tgt = nave_camera(t)
         yaw, pitch = look_angles(pos, tgt)
         return cam_from_yaw_pitch(pos, yaw, pitch, FOV)
+    # the turn that makes the image on the floor upright, spread over the whole move
+    yaw = 180.0 * smooth((t - YAW_T0) / (YAW_T1 - YAW_T0))
     if t >= RISE_T1:
         a = smooth((t - RISE_T1) / (36.0 - RISE_T1))
-        pos = np.array([0.0, lerp(20.6, 19.4, a), PATCH_Z])
-        return cam_from_yaw_pitch(pos, 180.0, -90.0, FOV_TOP)
-    # Catmull-Rom through the rise keys, with a global ease so the move starts
-    # and ends at rest.
-    keys = RISE_KEYS
+        pos = np.array([0.0, lerp(20.6, 19.5, a), PATCH_Z])
+        return cam_from_yaw_pitch(pos, yaw, -90.0, FOV_TOP)
+    p0, pi0 = _rise_start()
+    keys = [(RISE_KEYS[0][0], p0, pi0)] + [(k[0], k[1], k[3]) for k in RISE_KEYS[1:]]
     tt = RISE_T0 + (RISE_T1 - RISE_T0) * trapezoid((t - RISE_T0) / (RISE_T1 - RISE_T0))
     for i in range(len(keys) - 1):
         if keys[i][0] <= tt <= keys[i + 1][0]:
@@ -183,10 +191,9 @@ def camera(t):
     k3 = keys[min(i + 2, len(keys) - 1)]
     s = (tt - k1[0]) / (k2[0] - k1[0])
     pos = _catmull(k0[1], k1[1], k2[1], k3[1], s)
-    yaw = _catmull(np.array(k0[2]), np.array(k1[2]), np.array(k2[2]), np.array(k3[2]), s)
-    pitch = _catmull(np.array(k0[3]), np.array(k1[3]), np.array(k2[3]), np.array(k3[3]), s)
+    pitch = float(_catmull(np.array(k0[2]), np.array(k1[2]), np.array(k2[2]), np.array(k3[2]), s))
     fov = lerp(FOV, FOV_TOP, smooth((tt - RISE_T0) / (RISE_T1 - RISE_T0)))
-    return cam_from_yaw_pitch(pos, float(yaw), float(np.clip(pitch, -90.0, 89.0)), fov)
+    return cam_from_yaw_pitch(pos, yaw, float(np.clip(pitch, -90.0, 89.0)), fov)
 
 
 # ------------------------------------------------------------------- cells --
@@ -246,15 +253,15 @@ START = np.zeros((NB, 3))
 Q0 = np.zeros((NB, 4))
 _cam0 = np.array([0.0, 2.4, 31.0])
 # the first four cubes enter from just beside the camera so their words can be read
-_hero_starts = [np.array([3.3, 0.9, 30.6]), np.array([-3.6, 5.6, 30.2]),
-                np.array([3.9, 5.2, 29.8]), np.array([-3.3, 0.5, 30.3])]
+_hero_starts = [np.array([4.7, 1.6, 26.2]), np.array([-4.9, 5.3, 25.8]),
+                np.array([4.9, 5.7, 25.6]), np.array([-4.7, 1.2, 26.0])]
 HERO = set()
 for n, k in enumerate(FILL_ORDER):
     if n < 4:
         START[k] = _hero_starts[n]
         ang = math.radians(rng.uniform(14, 26))
         HERO.add(k)
-        LAND[k] = LAUNCH[k] + 2.7 - 0.15 * n
+        LAND[k] = LAUNCH[k] + 3.3 - 0.15 * n
     else:
         side = 1.0 if rng.random() < 0.5 else -1.0
         START[k] = _cam0 + np.array([side * rng.uniform(1.6, 5.5), rng.uniform(-1.8, 4.0), rng.uniform(0.5, 3.5)])
@@ -302,7 +309,7 @@ def block_state(k, t):
         p3 = end
         if k in HERO:
             # drift into view slowly, then glide to the window
-            s = 0.5 - 0.5 * math.cos(math.pi * tau ** 0.85)
+            s = 0.5 - 0.5 * math.cos(math.pi * tau)
             p1 = p0 + np.array([-0.45 * p0[0], 0.2, -6.0])
             p2 = p3 + np.array([0.0, 0.0, 6.0])
         else:
@@ -570,9 +577,11 @@ def grade(t):
     )
     if t >= 32.0:
         # the light swells until it envelops the whole frame
-        a = smooth(ramp(t, 32.6, 34.6))
+        a = smooth(ramp(t, 33.1, 35.0))
         g['exposure'] = lerp(1.0, 7.5, a ** 1.4)
         g['bloom'] = lerp(0.12, 0.55, a)
-        g['white'] = smooth(ramp(t, 33.6, 35.2)) * 0.72
+        w = smooth(ramp(t, 34.0, 35.4)) * 0.72 + smooth(ramp(t, 35.2, 35.95)) * 0.22
+        g['white'] = w
+        g['saturation'] = lerp(g['saturation'], 0.55, smooth(ramp(t, 33.8, 35.2)))
         g['vignette'] = lerp(0.30, 0.0, a)
     return g

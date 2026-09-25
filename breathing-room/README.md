@@ -8,8 +8,7 @@ No people appear in the film. Everything is procedural: the geometry, the staine
 
 | file | what |
 | --- | --- |
-| `output/breathing_room.mp4` | the film with its procedural soundtrack (H.264 + AAC) |
-| `output/breathing_room_silent.mp4` | the same picture without sound |
+| `output/breathing_room.mp4` | the film with its procedural soundtrack (H.264 High, BT.709, CRF 20 + AAC 256 kb/s, 1200 frames) |
 | `output/stained_glass_design.png` | the original, symmetrical window design every light effect is computed from |
 | `output/jaga_tech_emblem_traced.svg` | the emblem vectorised from `assets/logo final 111.jpeg` (99.3 % IoU with the reference) |
 | `output/contact_sheet.jpg` | one frame per second |
@@ -23,7 +22,7 @@ No people appear in the film. Everything is procedural: the geometry, the staine
 | 11–14 s | The window is sealed: darkness and silence. As the eye adapts, the engraved words glow faintly. |
 | 14–19 s | The *BUSY* cube over Mary's praying hands trembles and slides out. It falls and dissolves into particles of light. A red, blue and gold shaft falls through the gap. |
 | 19–26 s | Chain reaction outward from that opening. Every gap adds a coloured column of light and uncovers more of the glass. |
-| 26–33 s | The camera cranes up through the light columns and turns to look straight down. The Virgin and the angels cover the floor in coloured light. |
+| 25.4–33 s | The camera glides into the light columns, cranes up through them and turns to look straight down. The Virgin and the angels cover the floor in coloured light, upright by 32.6 s. |
 | 33–36 s | The light swells until the whole frame is white. *Abundance lives in the space between.* |
 | 36–40 s | The light implodes into shadow. The emblem rises as a dark silhouette against a cold halo, then its letters J·A·G·A / TECH ignite in electric-blue neon and its circuitry in gold, and they pulse. Cut to black at 39.8 s. |
 
@@ -49,8 +48,10 @@ python render.py assets                 # stained glass + textures -> build/
 python render.py still 22.0 test.png    # any single moment
 python render.py frames 0 1200          # PNG sequence -> build/frames/f0000.png ...
 python audio.py build/soundtrack.wav
-python render.py encode                 # -> output/*.mp4
+python render.py encode                 # -> output/breathing_room.mp4 (+ a silent copy)
 ```
+
+`render_all.sh` runs the whole pipeline with two worker processes.
 
 Each frame takes about 2–6 s on 4 CPU cores at 1080p. Set `BR_W=960 BR_H=540` for a fast preview.
 

@@ -143,7 +143,7 @@ class Renderer:
         return tile_n, tile_i
 
     # ------------------------------------------------------------ one image --
-    def render_hdr(self, t, subframes=1, shutter=1.0 / 60.0):
+    def render_hdr(self, t, subframes=1, shutter=1.0 / 72.0):
         w, h = self.w, self.h
         acc = np.zeros((h, w, 3), np.float32)
         depth_c = None
@@ -201,7 +201,7 @@ class Renderer:
             S.splat_points(C, w, h, pp, glow, pr, depth_c, hdr)
         return hdr
 
-    def subframes(self, t, shutter=1.0 / 60.0):
+    def subframes(self, t, shutter=1.0 / 72.0):
         """Enough temporal samples that fast cubes smear instead of strobing."""
         Ca, Cb = TL.camera(t - shutter / 2), TL.camera(t + shutter / 2)
         Ba, _, _, _, _ = TL.blocks(t - shutter / 2)
@@ -214,7 +214,34 @@ class Renderer:
                 continue
             ra = np.linalg.norm(Ba[k, 3:12] - Bb[k, 3:12]) * pa[2]
             worst = max(worst, math.hypot(pa[0] - pb[0], pa[1] - pb[1]) + ra)
-        return int(min(10, max(1, math.ceil(worst / 4.0))))
+        worst = max(worst, 1.25 * self._camera_motion(t, shutter))
+        return int(min(12, max(1, math.ceil(worst / 4.0))))
+
+    def _camera_motion(self, t, shutter):
+        """Screen motion (px) of the room's surfaces caused by the camera over the shutter."""
+        Cm, Ca, Cb = TL.camera(t), TL.camera(t - shutter / 2), TL.camera(t + shutter / 2)
+        if np.allclose(Ca, Cb, atol=1e-6):
+            return 0.0
+        o = Cm[0:3]
+        worst = 0.0
+        for fx in (0.03, 0.5, 0.97):
+            for fy in (0.03, 0.5, 0.97):
+                ndx = (2 * fx - 1) * Cm[12]
+                ndy = (1 - 2 * fy) * Cm[13]
+                d = Cm[9:12] + ndx * Cm[3:6] + ndy * Cm[6:9]
+                d /= np.linalg.norm(d)
+                best = 1e9
+                for axis, val in ((1, 0.0), (1, S.HC), (0, S.XW), (0, -S.XW), (2, 0.0), (2, S.ZB)):
+                    if abs(d[axis]) > 1e-9:
+                        tt = (val - o[axis]) / d[axis]
+                        if 1e-3 < tt < best:
+                            best = tt
+                p = o + d * min(best, 200.0)
+                pa, pb = self._project(Ca, p), self._project(Cb, p)
+                if pa is None or pb is None:
+                    continue
+                worst = max(worst, math.hypot(pa[0] - pb[0], pa[1] - pb[1]))
+        return worst
 
     def _project(self, C, p):
         rel = p - C[0:3]

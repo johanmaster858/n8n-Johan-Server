@@ -349,7 +349,7 @@ def build():
     n = secs(7.0)
     tt = np.arange(n) / SR
     rise = svf(pink(n), 300 + 2500 * (tt / 7.0) ** 1.5, 1.0, 1) * np.sin(np.pi * tt / 7.0) ** 1.5
-    hall.add(26.0, rise, 0.030)
+    hall.add(25.6, rise, 0.030)
     # 33-36 s: the swell of light (reverse-cymbal-like air)
     n = secs(3.0)
     tt = np.arange(n) / SR

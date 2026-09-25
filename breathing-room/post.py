@@ -64,7 +64,7 @@ def grade_image(hdr, g):
     x = x * np.array(g['tint'], np.float32) + np.array(g['lift'], np.float32)
     if g.get('white', 0) > 0:
         wv = g['white']
-        x = x * (1 - wv) + wv * np.array([1.0, 0.97, 0.9], np.float32)
+        x = x * (1 - wv) + wv * np.array([1.0, 0.975, 0.91], np.float32)
     h, w = x.shape[:2]
     x = x * (1 - g['vignette'] * vignette_mask(h, w))[..., None]
     return to_srgb(np.clip(x, 0, 1)).astype(np.float32)
@@ -136,7 +136,7 @@ def draw_titles(img, t):
     return img
 
 
-def grain(img, frame, strength=0.011):
+def grain(img, frame, strength=0.006):
     rng = np.random.default_rng(1000 + frame)
     h, w = img.shape[:2]
     n = rng.standard_normal((h // 2, w // 2)).astype(np.float32)

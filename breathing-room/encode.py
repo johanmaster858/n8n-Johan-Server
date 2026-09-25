@@ -15,7 +15,7 @@ def ffmpeg(args):
     subprocess.run(cmd, check=True)
 
 
-def encode(frames, out, audio=None, crf=16, fps=30):
+def encode(frames, out, audio=None, crf=20, fps=30):
     vf = 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p'
     args = ['-framerate', str(fps), '-i', os.path.join(frames, 'f%04d.png')]
     if audio:

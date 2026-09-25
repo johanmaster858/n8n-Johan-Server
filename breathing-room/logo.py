@@ -164,6 +164,13 @@ class Emblem:
         self.hx = self.ox + (700 - x0) * sc
         self.hy = self.oy + (420 - y0) * sc
         rng = np.random.default_rng(12)
+        # dust from the cathedral still drifts in the halo's light
+        nm = 700
+        self.mx = rng.uniform(0, W, nm)
+        self.my = rng.uniform(0, H, nm)
+        self.mph = rng.uniform(0, 2 * math.pi, nm)
+        self.mspd = rng.uniform(4.0, 16.0, nm)
+        self.mb = rng.lognormal(0.0, 0.6, nm)
         self.fog = [cv2.GaussianBlur(rng.standard_normal((H // 8, W // 8)).astype(np.float32), (0, 0), s)
                     for s in (3.0, 7.0)]
 
@@ -259,7 +266,7 @@ class Emblem:
         d = np.sqrt((self.xx - hx) ** 2 + (self.yy - hy) ** 2)
         R0 = 215.0 * push
         disc = np.exp(-(d / R0) ** 2 * 1.6)
-        ring = np.exp(-((d - R0 * 1.18) / 9.0) ** 2) + 0.35 * np.exp(-((d - R0 * 1.18) / 40.0) ** 2)
+        ring = np.exp(-((d - R0 * 1.18) / 8.0) ** 2) + 0.30 * np.exp(-((d - R0 * 1.18) / 36.0) ** 2)
         cold = np.array([0.62, 0.74, 1.0], np.float32)
         elec = np.array([0.10, 0.36, 1.0], np.float32)
         gold = np.array([1.0, 0.62, 0.12], np.float32)
@@ -267,15 +274,29 @@ class Emblem:
         back_col = cold * (1 - pw) + elec * pw
         rise = emerge ** 1.6
         # once the emblem powers up, the halo sinks into a deep electric blue
-        back = (disc * 0.9 * (1.0 - 0.62 * pw) + ring * 0.55 * (1.0 + 0.4 * pw)) * rise * (1.0 + 0.9 * surge)
+        back = (disc * 0.9 * (1.0 - 0.70 * pw) + ring * 0.55 * (1.0 - 0.1 * pw)) * rise * (1.0 + 0.9 * surge)
         unocc = back * (1.0 - L)
         # volumetric shafts streaming past the emblem: stark shadows in the haze
         rays = self.radial_rays(unocc * fog, hx, hy, decay=0.985)
-        img += rays[..., None] * back_col * (1.9 + 0.6 * pw)
-        img += (unocc * 0.55)[..., None] * back_col
+        # after ignition the haze sinks back so the neon owns the frame
+        img += rays[..., None] * back_col * (1.9 - 0.85 * pw)
+        img += (unocc * (0.55 - 0.30 * pw))[..., None] * back_col
         if pw > 0:
             img += (rays * 0.9 * pw)[..., None] * gold * 0.35
         img += (fog * 0.010 * rise * (1 + 2 * pw))[..., None] * back_col
+        # drifting motes, lit only where the halo's light reaches them
+        dt = t - T_EMERGE
+        mxp = (self.mx + 6.0 * np.sin(dt * 0.7 + self.mph)) % W
+        myp = (self.my - self.mspd * dt) % H
+        lightf = rays + unocc
+        xi = np.clip(mxp.astype(int), 0, W - 1)
+        yi = np.clip(myp.astype(int), 0, H - 1)
+        lit = lightf[yi, xi] * self.mb * (0.4 + 0.6 * np.sin(dt * 2.3 + self.mph * 3) ** 2)
+        acc = np.zeros((H, W), np.float32)
+        np.add.at(acc, (yi, xi), lit.astype(np.float32))
+        acc = cv2.GaussianBlur(acc, (0, 0), 1.1) * 9.0
+        mote_col = cold * (1 - pw) + (0.6 * elec + 0.4 * gold) * pw
+        img += acc[..., None] * mote_col
 
         # ---- the emblem: a dark body, its edges caught by the halo ------------
         d_in = self.place(self.d_in, push)
@@ -350,7 +371,7 @@ class Emblem:
         vig = post.vignette_mask(H, W)
         x = x * (1 - vignette * vig)[..., None]
         x = post.to_srgb(np.clip(x, 0, 1)).astype(np.float32)
-        x = post.grain(x, fi, 0.012)
+        x = post.grain(x, fi, 0.007)
         return post.to_uint8(x, fi)
 
 

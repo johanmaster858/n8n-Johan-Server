@@ -772,7 +772,7 @@ def shade(P, ox, oy, oz, dx, dy, dz, t, mat, nx, ny, nz, idx, a1, a2, a3, a4,
         ag = base * 0.99
         ab = base * 1.03
         w = int(BLK[idx, 15])
-        if w >= 0:
+        if w >= 0 and ax == 2:        # engraved on the front and back faces only
             texpp = fw / (2.0 * h) * WORDM.shape[2]
             lod = math.log2(max(texpp, 1.0)) * 0.5
             wl1 = clamp01(lod)
