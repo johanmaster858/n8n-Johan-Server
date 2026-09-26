@@ -1,0 +1,10 @@
+{
+  "name": "autumn-echoes-web",
+  "private": true,
+  "version": "1.0.0",
+  "description": "three.js scenes for the short film Autumn Echoes",
+  "type": "module",
+  "dependencies": {
+    "three": "^0.170.0"
+  }
+}

@@ -1,0 +1,7 @@
+build/
+frames/
+logs/
+stills/
+__pycache__/
+*.pyc
+web/node_modules/
