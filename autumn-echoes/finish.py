@@ -33,7 +33,7 @@ FADE_IN, FADE_OUT = 0.7, 0.7
 
 ORDER = ['forest', 'hand', 'boots', 'campfire', 'aerial']
 # how each overlap blends: glow = a bloom of warm light at the midpoint
-TRANSITION = {('forest', 'hand'): 0.9, ('hand', 'boots'): 0.35, ('boots', 'campfire'): 0.25, ('campfire', 'aerial'): 0.45}
+TRANSITION = {('forest', 'hand'): 0.35, ('hand', 'boots'): 0.3, ('boots', 'campfire'): 0.25, ('campfire', 'aerial'): 0.4}
 
 SRGB2LIN = ((np.arange(256) / 255.0) ** 2.2).astype(np.float32)
 
@@ -228,9 +228,9 @@ def draw_titles(img, t):
         # darken behind the words in proportion to how bright the background is
         wsum = float(backdrop.sum()) + 1e-6
         lum = float((reg.mean(axis=2) * backdrop).sum()) / wsum
-        kb = np.clip((lum - 0.25) * 1.1, 0.12, 0.55)
+        kb = np.clip((lum - 0.22) * 1.25, 0.12, 0.72)
         reg = reg * (1 - kb * a * backdrop[..., None])
-        reg = reg * (1 - 0.6 * a * shadow[..., None])
+        reg = reg * (1 - (0.55 + 0.3 * kb) * a * shadow[..., None])
         # soft warm glow, then the letters
         gcol = np.array([1.0, 0.82, 0.55], np.float32)
         reg = 1 - (1 - reg) * (1 - 0.22 * a * glow[..., None] * gcol)
@@ -240,7 +240,7 @@ def draw_titles(img, t):
     return img
 
 
-def grain(img, i, strength=0.012):
+def grain(img, i, strength=0.0065):
     rng = np.random.default_rng(1000 + i)
     n = rng.standard_normal((H // 2, W // 2)).astype(np.float32)
     n = cv2.resize(n, (W, H), interpolation=cv2.INTER_LINEAR)
@@ -268,11 +268,20 @@ def main():
             cv2.imwrite(os.path.join(out, '%05d.png' % i), final_frame(i)[..., ::-1])
             print('preview', i, flush=True)
         return
-    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'build', 'video.mp4')
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    cmd = [FFMPEG, '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', '%dx%d' % (W, H), '-r', str(FPS), '-i', '-',
-           '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-pix_fmt', 'yuv420p',
-           '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-movflags', '+faststart', out]
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    opts = dict(a[2:].split('=', 1) for a in sys.argv[1:] if a.startswith('--') and '=' in a)
+    out = args[0] if args else os.path.join(HERE, 'build', 'video.mp4')
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    rate = ['-crf', '17'] if 'bitrate' not in opts else ['-b:v', opts['bitrate'], '-maxrate', opts.get('maxrate', opts['bitrate']),
+                                                          '-bufsize', opts.get('bufsize', '20M'), '-pass', opts.get('pass', '1'),
+                                                          '-passlogfile', opts.get('passlog', os.path.join(HERE, 'build', 'x264'))]
+    src = [FFMPEG, '-y', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', '%dx%d' % (W, H), '-r', str(FPS), '-i', '-']
+    tags = ['-pix_fmt', 'yuv420p', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709']
+    if 'lossless' in opts:
+        # mathematically lossless 4:2:0 intermediate for the final encodes
+        cmd = src + ['-c:v', 'libx264', '-preset', 'ultrafast', '-qp', '0'] + tags + ['-f', 'matroska', out]
+    else:
+        cmd = src + ['-c:v', 'libx264', '-preset', 'slow', '-tune', 'film'] + rate + tags + ['-movflags', '+faststart', '-f', 'mp4', out]
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     with Pool(3) as pool:
         for n, fr in enumerate(pool.imap(final_frame, range(N), chunksize=4)):

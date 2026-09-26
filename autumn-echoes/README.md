@@ -58,8 +58,15 @@ Everything is procedural; no downloaded models, textures or samples are used. Th
 cd autumn-echoes/web && npm install              # three.js
 cd .. && python3 render.py forest                 # and hand, boots, campfire, aerial
 python3 audio.py build/soundtrack.wav
-python3 finish.py build/video.mp4                 # picture
-ffmpeg -i build/video.mp4 -i build/soundtrack.wav -c:v copy -c:a aac -b:a 192k -shortest output/autumn_echoes.mp4
+python3 finish.py build/master_lossless.mkv --lossless=1      # finished picture, lossless 4:2:0
+# two-pass H.264 master with the soundtrack (about 9 Mb/s, 46 MB)
+ffmpeg -i build/master_lossless.mkv -c:v libx264 -preset slow -tune film -b:v 8800k -maxrate 13M -bufsize 16M \
+       -pass 1 -an -f null /dev/null
+ffmpeg -i build/master_lossless.mkv -i build/soundtrack.wav -map 0:v -map 1:a -c:v libx264 -preset slow -tune film \
+       -b:v 8800k -maxrate 13M -bufsize 16M -pass 2 -pix_fmt yuv420p -colorspace bt709 -color_primaries bt709 \
+       -color_trc bt709 -c:a aac -b:a 192k -movflags +faststart -shortest output/autumn_echoes.mp4
 ```
+
+Output: `output/autumn_echoes.mp4` (40.0 s, 1080 × 1920, 30 fps, H.264 + AAC stereo) and `output/contact_sheet.jpg` (one frame per second).
 
 Test stills: `python3 still.py SCENE t1 t2 ... [--w 540 --h 960]`.
