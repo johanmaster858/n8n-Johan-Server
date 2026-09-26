@@ -233,9 +233,11 @@ export function buildObjects() {
     hole.rotation.x = Math.PI / 2;
     hole.position.set(0, -0.012, 0.0142);
     g.add(hole);
-    g.position.set(0.06, 0.017, 0.46);
-    g.rotation.set(-Math.PI / 2 + 0.08, 0, 0.5);
-    objects.padlock = { group: g, size: 0.12 };
+    // a hefty old padlock standing on top of the book stack
+    g.scale.setScalar(1.3);
+    g.position.set(0.315, 0.27 + 0.036 * 1.3 + 0.001, 0.125);
+    g.rotation.set(0, -0.25, 0.04);
+    objects.padlock = { group: g, size: 0.16 };
   }
   return objects;
 }

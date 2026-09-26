@@ -164,7 +164,13 @@ export class ForestScene {
     }
 
     // --- leaf litter (static), avoiding the objects' footprint
-    const boxes = Object.values(this.objects).map((o) => new THREE.Box3().setFromObject(o.group).expandByScalar(0.02));
+    // litter footprints (the padlock's original spot on the ground is kept so the litter layout is unchanged)
+    const legacyLock = this.objects.padlock.group.clone();
+    legacyLock.position.set(0.06, 0.017, 0.46);
+    legacyLock.rotation.set(-Math.PI / 2 + 0.08, 0, 0.5);
+    legacyLock.scale.setScalar(1);
+    legacyLock.updateMatrixWorld(true);
+    const boxes = Object.entries(this.objects).map(([name, o]) => new THREE.Box3().setFromObject(name === 'padlock' ? legacyLock : o.group).expandByScalar(0.02));
     const blocked = (x, z) => boxes.some((b) => x > b.min.x && x < b.max.x && z > b.min.z && z < b.max.z);
     const litterN = 62000;
     const litter = leafInstances(litterN, atlas.colorTex, atlas.auxTex, { size: 0.13, seg: 2, castShadow: false });
