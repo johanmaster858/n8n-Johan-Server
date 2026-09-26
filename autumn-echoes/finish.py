@@ -24,10 +24,10 @@ FFMPEG = os.environ.get('FFMPEG', '/usr/local/lib/python3.11/dist-packages/image
 # on-screen words (Spanish), bottom centre
 TEXTS = [
     (0.45, 5.0, 'A veces, nos llenamos de cosas...'),
-    (6.0, 11.0, '...buscando una felicidad que no se toca.'),
+    (6.0, 11.0, '...buscando una felicidad\nque no se toca.'),
     (14.0, 18.0, 'Mi felicidad no se mide en bienes,'),
     (19.0, 23.0, 'se mide en recuerdos y anhelos.'),
-    (26.0, 31.0, 'Al final, solo somos las historias que vivimos.'),
+    (26.0, 31.0, 'Al final, solo somos\nlas historias que vivimos.'),
 ]
 FADE_IN, FADE_OUT = 0.7, 0.7
 
@@ -85,14 +85,36 @@ _r = np.sqrt(((_xx - W / 2) / (W * 0.62)) ** 2 + ((_yy - H * 0.46) / (H * 0.5)) 
 def amber_field(t):
     """A warm, glowing amber vignette (linear RGB)."""
     breathe = 1.0 + 0.03 * math.sin(t * 2.1)
-    inner = np.array([1.0, 0.62, 0.26], np.float32)
-    mid = np.array([0.62, 0.24, 0.06], np.float32)
-    outer = np.array([0.05, 0.015, 0.004], np.float32)
-    a = np.clip(_r / 0.55, 0, 1)[..., None]
-    b = np.clip((_r - 0.55) / 0.75, 0, 1)[..., None]
+    inner = np.array([1.1, 0.58, 0.17], np.float32)
+    mid = np.array([0.72, 0.22, 0.035], np.float32)
+    outer = np.array([0.03, 0.008, 0.002], np.float32)
+    a = np.clip(_r / 0.55, 0, 1)[..., None] ** 1.1
+    rb = np.clip((_r - 0.3) / 1.1, 0, 1)[..., None]
+    b = rb * rb * (3 - 2 * rb)
     col = inner * (1 - a) + mid * a
     col = col * (1 - b) + outer * b
-    return col * breathe
+    return col * breathe + motes(t)
+
+
+_mrng = np.random.default_rng(77)
+_MOTES = [(_mrng.uniform(0.1, 0.9) * W, _mrng.uniform(0.2, 1.1) * H, _mrng.uniform(12, 40), _mrng.uniform(30, 90), _mrng.uniform(0, 6.28),
+           _mrng.uniform(0.3, 1.0)) for _ in range(70)]
+
+
+def motes(t):
+    """Soft out-of-focus embers drifting up through the amber light (32.5-38 s)."""
+    k = fsstep(32.5, 34.0, t) * (1 - fsstep(36.8, 38.2, t))
+    out = np.zeros((H // 4, W // 4), np.float32)
+    if k <= 0:
+        return 0.0
+    for (x0, y0, r, v, ph, b) in _MOTES:
+        x = (x0 + 25 * math.sin(t * 0.7 + ph)) / 4
+        y = (y0 - v * (t - 32.0)) / 4
+        if -20 < y < H / 4 + 20:
+            cv2.circle(out, (int(x), int(y)), max(int(r / 4), 1), float(b * (0.6 + 0.4 * math.sin(t * 3 + ph))), -1, lineType=cv2.LINE_AA)
+    out = cv2.GaussianBlur(out, (0, 0), 1.5)
+    out = cv2.resize(out, (W, H), interpolation=cv2.INTER_LINEAR)
+    return out[..., None] * np.array([1.0, 0.62, 0.25], np.float32) * 0.35 * k
 
 
 _emblem = None
@@ -168,7 +190,7 @@ def text_layers(text):
     size = int(round(H * 0.0375))
     font = ImageFont.truetype(FONT, size)
     font.set_variation_by_name(b'SemiBold')
-    lines = _wrap(text, font, W * 0.84)
+    lines = text.split('\n') if '\n' in text else _wrap(text, font, W * 0.9)
     lh = size * 1.22
     pad = int(size * 1.6)
     tw = int(max(font.getlength(l) for l in lines)) + 2 * pad

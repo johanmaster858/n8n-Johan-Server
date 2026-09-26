@@ -119,9 +119,12 @@ class EmberEmblem:
         L = self.L
         emit = ember_ramp(h) * (h[..., None] ** 1.2) * 3.2 * L[..., None]
         # dark charcoal where not yet (or no longer) glowing
-        char = np.array([0.006, 0.004, 0.003], np.float32) * L[..., None]
-        vis = fsstep(35.9, 36.6, t) * (1 - fsstep(39.2, 39.75, t))
-        img = background * (1 - L[..., None] * vis) + char * vis + emit
+        char = np.array([0.006, 0.004, 0.003], np.float32)
+        # the emblem appears as it catches: charcoal only just ahead of the kindling front
+        front = fsstep(36.0, 37.4, t) * 1.35
+        near = sstep(-0.32, 0.0, front - self.v - 0.12 * self.noise[1]) * (1 - fsstep(39.2, 39.75, t))
+        occ = (L * near)[..., None]
+        img = background * (1 - occ) + char * occ + emit
         # glow: layered blurs of the emission
         small = cv2.resize(emit, (W // 4, H // 4), interpolation=cv2.INTER_AREA)
         g = cv2.GaussianBlur(small, (0, 0), 3) * 0.6 + cv2.GaussianBlur(small, (0, 0), 12) * 0.55 + cv2.GaussianBlur(small, (0, 0), 40) * 0.7
